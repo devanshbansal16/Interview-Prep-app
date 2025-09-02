@@ -1,9 +1,7 @@
-const { GoogleGenAI } = require("@google/genai");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { questionAnswerPrompt, conceptExplainPrompt } = require("../utils/prompts");
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-});
+const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 //@desc Generate interview questions and answers using Gemini
 //@route POST /api/ai/generate-questions
@@ -90,43 +88,135 @@ const generateConceptExplanation = async (req, res) => {
     const response = await result.response;
     const text = response.text();
 
-    const cleanedText = text
-      .replace(/^```json\s*/, "")
-      .replace(/```$/, "")
-      .trim();
+    // Enhanced JSON parsing with multiple fallback strategies
+    let parsedData = null;
+    let parseSuccess = false;
 
+    // Strategy 1: Try to clean and parse the original text
     try {
-      const data = JSON.parse(cleanedText);
+      const cleanedText = text
+        .replace(/^```json\s*/, "")
+        .replace(/```$/, "")
+        .trim();
 
-      // Validate the AI response structure
-      if (!data.title || !data.explanation || !data.examples || !data.keyPoints || !data.detailedSteps) {
-        throw new Error("AI response missing required fields");
-      }
+      parsedData = JSON.parse(cleanedText);
+      parseSuccess = true;
+      console.log("✅ AI Response: Successfully parsed with basic strategy");
+    } catch (error) {
+      // This is normal - AI responses often need advanced parsing
+      console.log("🔄 AI Response: Using advanced parsing strategies...");
+    }
 
-      console.log("Successfully parsed AI response");
-      res.status(200).json({ success: true, data });
-    } catch (parseError) {
-      console.error("JSON parse error:", parseError);
-      console.error("Failed to parse AI response, attempting to fix...");
-
-      // Try to extract JSON from the response if it's wrapped in markdown
+    // Strategy 2: Try to extract JSON using regex with better pattern matching
+    if (!parseSuccess) {
       try {
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const extractedJson = JSON.parse(jsonMatch[0]);
-          console.log("Successfully extracted JSON from response");
-          res.status(200).json({ success: true, data: extractedJson });
-          return;
-        }
-      } catch (extractError) {
-        console.error("Failed to extract JSON:", extractError);
-      }
+        // Look for JSON object with proper structure - more flexible pattern
+        const jsonPattern = /\{[\s\S]*?"title"[\s\S]*?"explanation"[\s\S]*?"examples"[\s\S]*?"keyPoints"[\s\S]*?"detailedSteps"[\s\S]*?\}/;
+        const jsonMatch = text.match(jsonPattern);
 
-      // Only fallback to mock data if AI completely fails
-      console.log("Using fallback mock explanation due to AI parsing failure");
+        if (jsonMatch) {
+          // Clean up the extracted JSON before parsing
+          let extractedJson = jsonMatch[0];
+
+          // Remove any trailing content after the JSON object
+          const lastBraceIndex = extractedJson.lastIndexOf('}');
+          if (lastBraceIndex !== -1) {
+            extractedJson = extractedJson.substring(0, lastBraceIndex + 1);
+          }
+
+          // Fix common issues in the extracted JSON
+          extractedJson = extractedJson
+            .replace(/,\s*}/g, "}") // Remove trailing commas
+            .replace(/,\s*]/g, "]") // Remove trailing commas in arrays
+            .replace(/\n/g, "\\n") // Escape newlines
+            .replace(/\r/g, "\\r") // Escape carriage returns
+            .replace(/\t/g, "\\t"); // Escape tabs
+
+          parsedData = JSON.parse(extractedJson);
+          parseSuccess = true;
+          console.log("✅ AI Response: Successfully parsed with pattern matching");
+        }
+      } catch (error) {
+        // Continue to next strategy silently
+      }
+    }
+
+    // Strategy 3: Try to find the largest valid JSON object
+    if (!parseSuccess) {
+      try {
+        const jsonMatches = text.match(/\{[\s\S]*?\}/g);
+        if (jsonMatches) {
+          // Find the largest JSON object that might be valid
+          let largestJson = "";
+          for (const match of jsonMatches) {
+            if (match.length > largestJson.length) {
+              try {
+                JSON.parse(match);
+                largestJson = match;
+              } catch (e) {
+                // Continue to next match
+              }
+            }
+          }
+
+          if (largestJson) {
+            parsedData = JSON.parse(largestJson);
+            parseSuccess = true;
+            console.log("✅ AI Response: Successfully parsed with largest JSON strategy");
+          }
+        }
+      } catch (error) {
+        // Continue to next strategy silently
+      }
+    }
+
+    // Strategy 4: Try to fix common JSON issues
+    if (!parseSuccess) {
+      try {
+        let fixedText = text
+          .replace(/^```json\s*/, "")
+          .replace(/```$/, "")
+          .replace(/,\s*}/g, "}") // Remove trailing commas
+          .replace(/,\s*]/g, "]") // Remove trailing commas in arrays
+          .replace(/\n/g, "\\n") // Escape newlines
+          .replace(/\r/g, "\\r") // Escape carriage returns
+          .replace(/\t/g, "\\t"); // Escape tabs
+
+        // Try to find the end of the JSON object
+        const braceCount = (fixedText.match(/\{/g) || []).length;
+        const closeBraceCount = (fixedText.match(/\}/g) || []).length;
+
+        if (braceCount > closeBraceCount) {
+          // Add missing closing braces
+          fixedText += "}".repeat(braceCount - closeBraceCount);
+        }
+
+        parsedData = JSON.parse(fixedText);
+        parseSuccess = true;
+        console.log("✅ AI Response: Successfully parsed with JSON fixes");
+      } catch (error) {
+        console.log("⚠️ AI Response: Using fallback data due to parsing issues");
+      }
+    }
+
+    // If all strategies fail, use mock data
+    if (!parseSuccess) {
+      console.log("⚠️ AI Response: All parsing strategies failed, using fallback data");
       const mockExplanation = generateDetailedMockExplanation(question);
       res.status(200).json({ success: true, data: mockExplanation });
+      return;
     }
+
+    // Validate the parsed data structure
+    if (!parsedData.title || !parsedData.explanation || !parsedData.examples || !parsedData.keyPoints || !parsedData.detailedSteps) {
+      console.log("⚠️ AI Response: Missing required fields, using fallback data");
+      const mockExplanation = generateDetailedMockExplanation(question);
+      res.status(200).json({ success: true, data: mockExplanation });
+      return;
+    }
+
+    console.log("🎉 AI Response: Successfully generated and delivered!");
+    res.status(200).json({ success: true, data: parsedData });
   } catch (error) {
     console.error("AI explanation error:", error);
     // Fallback to mock data
