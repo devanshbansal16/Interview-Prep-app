@@ -1,4 +1,4 @@
-export const BASE_URL = "https://interview-prep-app-three.vercel.app";
+export const BASE_URL = "https://interview-prep-app-backend.onrender.com";
 
 export const API_PATHS = {
   AUTH: {
