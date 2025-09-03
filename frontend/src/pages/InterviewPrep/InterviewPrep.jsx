@@ -48,7 +48,8 @@ const InterviewPrep = () => {
       setErrorMsg("");
       setExplanation(null);
 
-      // No artificial delay - let AI respond naturally
+      // Show loading state for better UX
+      setIsLoading(true);
 
       const response = await aiAxiosInstance.post(API_PATHS.AI.GENERATE_EXPLANATION, {
         question,
@@ -88,6 +89,9 @@ const InterviewPrep = () => {
     try {
       setIsUpdateLoader(true);
       setErrorMsg("");
+      
+      // Show progress message
+      toast.info("Generating new questions... This may take a few minutes.");
 
             // Generate unique timestamp and random seed for variety
       const timestamp = Date.now();
@@ -152,9 +156,12 @@ const InterviewPrep = () => {
       }
 
       if (finalQuestions.length === 0) {
-        toast.success("Unable to generate new questions at this time. Please try again.");
+        toast.error("Unable to generate new questions at this time. Please try again.");
         return;
       }
+
+      // Show success message
+      toast.success(`Successfully generated ${finalQuestions.length} new questions!`);
 
       const response = await axiosInstance.post(
         API_PATHS.SESSION.ADD_TO_SESSION,

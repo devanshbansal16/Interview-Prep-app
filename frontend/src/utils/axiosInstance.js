@@ -3,7 +3,7 @@ import { BASE_URL } from "./apiPaths";
 
 export const axiosInstance = axios.create({
   baseURL: BASE_URL,
-  timeout: 60000, // Increased to 60 seconds for AI operations
+  timeout: 120000, // Increased to 2 minutes
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -13,7 +13,7 @@ export const axiosInstance = axios.create({
 // Special axios instance for AI operations with longer timeout
 export const aiAxiosInstance = axios.create({
   baseURL: BASE_URL,
-  timeout: 120000, // 2 minutes for AI operations
+  timeout: 300000, // 5 minutes for AI operations
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -86,7 +86,7 @@ aiAxiosInstance.interceptors.response.use(
         console.error("Server error, Please try again later.");
       }
     } else if (error.code === "ECONNABORTED") {
-      console.error("AI request timed out after 2 minutes. The AI is taking longer than expected to generate questions. Please try again.");
+      console.error("AI request timed out after 5 minutes. The AI is taking longer than expected to generate questions. Please try again.");
     } else {
       console.error("Something went wrong, Please try again later.");
     }
