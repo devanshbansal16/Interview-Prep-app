@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { LuX } from "react-icons/lu";
 import Input from "../../components/Inputs/Input";
 import SpinnerLoader from "../../components/Loader/SpinnerLoader";
-import axiosInstance from "../../utils/axiosInstance";
+import axiosInstance, { aiAxiosInstance } from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
 
 const CreateSessionForm = () => {
@@ -40,7 +40,7 @@ const CreateSessionForm = () => {
 
     try {
       // Call AI API to generate questions
-      const aiResponse = await axiosInstance.post(API_PATHS.AI.GENERATE_QUESTIONS, {
+      const aiResponse = await aiAxiosInstance.post(API_PATHS.AI.GENERATE_QUESTIONS, {
         role,
         experience,
         topicsToFocus,

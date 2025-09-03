@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import DashboardLayout from "../../components/layouts/DashboardLayout";
 import moment from "moment";
 import RoleInfoHeader from "./components/RoleInfoHeader";
-import axiosInstance from "../../utils/axiosInstance";
+import axiosInstance, { aiAxiosInstance } from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
 import QuestionCard from "../../components/Cards/QuestionCard";
 import { LuCircleAlert, LuListCollapse } from "react-icons/lu";
@@ -48,11 +48,9 @@ const InterviewPrep = () => {
       setErrorMsg("");
       setExplanation(null);
 
-      // Add a delay to show loading state (5-6 seconds)
-      const delay = Math.random() * 1000 + 5000; // Random delay between 5-6 seconds
-      await new Promise(resolve => setTimeout(resolve, delay));
+      // No artificial delay - let AI respond naturally
 
-      const response = await axiosInstance.post(API_PATHS.AI.GENERATE_EXPLANATION, {
+      const response = await aiAxiosInstance.post(API_PATHS.AI.GENERATE_EXPLANATION, {
         question,
       });
 
@@ -96,7 +94,7 @@ const InterviewPrep = () => {
       const randomSeed = Math.floor(Math.random() * 10000);
 
       // First attempt to generate questions - request 7 to ensure we get 5 unique ones
-      const airesponse = await axiosInstance.post(
+      const airesponse = await aiAxiosInstance.post(
         API_PATHS.SESSION.ADD_MORE_QUESTIONS,
         {
           role: sessionData.role,
@@ -124,40 +122,9 @@ const InterviewPrep = () => {
         )
       );
 
-      // If we don't have enough unique questions, try again with different parameters
+      // If we don't have enough unique questions, just use what we have
       if (newQuestions.length < 5) {
-        const retryTimestamp = Date.now() + 1000;
-        const retryRandomSeed = Math.floor(Math.random() * 20000);
-        
-        const retryResponse = await axiosInstance.post(
-          API_PATHS.SESSION.ADD_MORE_QUESTIONS,
-          {
-            role: sessionData.role,
-            experience: sessionData?.experience,
-            topicsToFocus: sessionData?.topicsToFocus,
-            numberOfQuestions: 7, // Request 7 for retry too
-            timestamp: retryTimestamp,
-            randomSeed: retryRandomSeed
-          }
-        );
-        
-        const retryQuestions = retryResponse.data.data || retryResponse.data;
-        
-        if (retryQuestions && Array.isArray(retryQuestions)) {
-          const uniqueRetryQuestions = retryQuestions.filter(newQ => 
-            !existingQuestions.some(existingQ => 
-              existingQ.question.toLowerCase().trim() === newQ.question.toLowerCase().trim()
-            )
-          );
-          
-          // Combine unique questions from both attempts
-          newQuestions = [...newQuestions, ...uniqueRetryQuestions];
-          
-          // Remove duplicates within the combined array
-          newQuestions = newQuestions.filter((question, index, self) => 
-            index === self.findIndex(q => q.question.toLowerCase().trim() === question.question.toLowerCase().trim())
-          );
-        }
+        console.log(`Generated ${newQuestions.length} unique questions, using available questions`);
       }
 
       // If still no unique questions, create modified versions to ensure we add something
