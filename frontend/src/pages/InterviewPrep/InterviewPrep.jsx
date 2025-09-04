@@ -86,12 +86,13 @@ const InterviewPrep = () => {
 
   // Load More Questions
   const uploadMoreQuestions = async () => {
+    if (isUpdateLoader) return;
     try {
       setIsUpdateLoader(true);
       setErrorMsg("");
       
       // Show progress message
-      toast.info("Generating new questions... This may take a few minutes.");
+      const loadingToastId = toast.loading("Generating new questions... This may take a few minutes.");
 
             // Generate unique timestamp and random seed for variety
       const timestamp = Date.now();
@@ -161,6 +162,9 @@ const InterviewPrep = () => {
       }
 
       // Show success message
+      if (loadingToastId) {
+        toast.dismiss(loadingToastId);
+      }
       toast.success(`Successfully generated ${finalQuestions.length} new questions!`);
 
       const response = await axiosInstance.post(
@@ -172,16 +176,26 @@ const InterviewPrep = () => {
       );
       
       if (response.data && response.data.success) {
+        if (loadingToastId) {
+          toast.dismiss(loadingToastId);
+        }
+        setIsUpdateLoader(false);
         toast.success(`Added ${finalQuestions.length} new questions!`);
         fetchSessionDetailsById();
       } else {
         throw new Error("Failed to add questions to session");
       }
     } catch (error) {
+      if (loadingToastId) {
+        toast.dismiss(loadingToastId);
+      }
       console.error("Error", error);
       setErrorMsg(error.message || "Failed to load more questions");
       toast.error(error.message || "Failed to load more questions");
     } finally {
+      if (loadingToastId) {
+        toast.dismiss(loadingToastId);
+      }
       setIsUpdateLoader(false);
     }
   };
