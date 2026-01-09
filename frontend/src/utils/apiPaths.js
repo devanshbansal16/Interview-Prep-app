@@ -1,4 +1,5 @@
-export const BASE_URL = "https://interview-prep-app-backend.onrender.com";
+// For local development, point to your locally running backend
+export const BASE_URL = "http://localhost:8000";
 
 export const API_PATHS = {
   AUTH: {
